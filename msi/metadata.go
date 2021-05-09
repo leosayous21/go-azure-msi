@@ -4,21 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"net/http"
 )
 
-const instanceMetaDataURL string = "http://169.254.169.254/metadata/instance?api-version=2017-04-02"
+const instanceMetaDataURL string = "http://169.254.169.254/metadata/instance?api-version=2019-08-15"
+
+type Compute struct {
+	Compute MetaData `json:"compute"`
+}
 
 type MetaData struct {
 	SubscriptionId string `json:"subscriptionId"`
 	VMName string `json:"name"`
 	VMssName string `json:"vmScaleSetName"`
 	ResourceGroupName string `json:"resourceGroupName"`
-}
-
-func init() {
-	log.SetFormatter(&log.JSONFormatter{})
 }
 
 /*GetInstanceMetadata ()
@@ -29,8 +29,7 @@ func GetInstanceMetadata() (MetaData, error) {
 	// Build a request to call the instance Azure in-VM metadata service
 	req, err := http.NewRequest("GET", instanceMetaDataURL, nil)
 	if err != nil {
-		log.Error("Failed creating http request --- %s", err)
-		return metadata, errors.New("failed creating http request object to retrieve instance metadata")
+		return metadata, errors.New(fmt.Sprintf("failed creating http request object to retrieve instance metadata - %s", err))
 	}
 
 	// Set the required header for the HTTP request
@@ -40,24 +39,24 @@ func GetInstanceMetadata() (MetaData, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error("Failed calling instance metadata service --- %s", err)
-		return metadata, errors.New("failed calling the in-VM instance metadata service")
-
+		return metadata, errors.New(fmt.Sprintf("failed calling the in-VM instance metadata service  %s", err))
 	}
 	// Complete reading the body
 	defer resp.Body.Close()
 
 	// Now return the instance metadata JSON or another error if the status code is not in 2xx range
 	if (resp.StatusCode >= 200) && (resp.StatusCode <= 299) {
-		dec := json.NewDecoder(resp.Body)
-		err = dec.Decode(&metadata)
+		bodyContent, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Error("Failed decoding Metadata from metadata endpoint --- %s", err)
-			return metadata, errors.New("failed decoding MSI token from MSI token endpoint")
+			return metadata, errors.New(fmt.Sprintf("failed reading resp.Body from metadata endpoint - %s", err))
+		}
+		var compute Compute
+		json.Unmarshal(bodyContent, &compute)
+		metadata = compute.Compute // Metadata is nested inside compute
+		if err != nil {
+			return metadata, errors.New(fmt.Sprintf("Failed decoding Metadata from metadata endpoint %s", err))
 		}
 		return metadata, nil
 	}
-
-	log.Error("Failed with Non-200 status code: %q", resp.StatusCode)
 	return metadata, errors.New(fmt.Sprintf("instance meta data service returned non-OK status code: %q", resp.StatusCode))
 }
