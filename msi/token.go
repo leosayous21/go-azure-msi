@@ -40,10 +40,8 @@ func GetMsiToken() (token MsiToken, err error) {
 	finalRequestURL := fmt.Sprintf("%s?api-version=2018-02-01&resource=%s", fmt.Sprintf(msiTokenURL), url.QueryEscape(resourceURL))
 	req, err := http.NewRequest("GET", finalRequestURL, nil)
 	if err != nil {
-		log.Error("Failed creating http request --- %s", err)
-		return myToken, errors.New("failed creating http request object to request MSI token")
+		return myToken, errors.New(fmt.Sprintf("failed creating http request object to request MSI token %s", err))
 	}
-
 	// Set the required header for the HTTP request
 	req.Header.Add("Metadata", "true")
 
@@ -51,8 +49,7 @@ func GetMsiToken() (token MsiToken, err error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error("Failed calling MSI token service --- %s", err)
-		return myToken, errors.New("failed calling MSI token service")
+		return myToken, errors.New(fmt.Sprintf("failed calling MSI token service %s", err))
 	}
 	// Complete reading the body
 	defer resp.Body.Close()
@@ -62,21 +59,16 @@ func GetMsiToken() (token MsiToken, err error) {
 		dec := json.NewDecoder(resp.Body)
 		err := dec.Decode(&myToken)
 		if err != nil {
-			log.Error("Failed decoding MSI token from MSI token endpoint --- %s", err)
-			return myToken, errors.New("failed decoding MSI token from MSI token endpoint")
+			return myToken, errors.New(fmt.Sprintf("failed decoding MSI token from MSI token endpoint  %s", err))
 		}
-
 		return myToken, nil
 	}
-
-	log.Error("Failed with Non-200 status code: %d", resp.StatusCode)
 
 	// Try to read the body and log the error details, nevertheless
 	bodyContent, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Error("Failed reading response body from http response for more error details")
+		log.Error(fmt.Sprintf("Failed reading response body from http response for more error details %s", err))
 	}
-	log.Error(string(bodyContent))
 
-	return myToken, errors.New(fmt.Sprintf("instance meta data service returned non-OK status code: %d ", resp.StatusCode))
+	return myToken, errors.New(fmt.Sprintf("instance meta data service returned non-OK status code: %d - %s", resp.StatusCode, bodyContent))
 }
