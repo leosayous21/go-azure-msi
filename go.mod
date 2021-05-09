@@ -1,4 +1,4 @@
-module github.com/leosayous21/go-azure-msi/msi
+module github.com/leosayous21/go-azure-msi
 
 go 1.16
 
